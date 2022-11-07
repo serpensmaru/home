@@ -1,14 +1,11 @@
 from rest_framework.decorators import api_view
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView, ListCreateAPIView, get_object_or_404
 from rest_framework.response import Response
 from .models import Sensor, Measurement
 from .serializers import SensorSerializer, SensorDetailSerializer
 
 
-class SensorGetList(ListAPIView):
-    """ ПОлучить сипско датчиков"""
-    queryset = Sensor.objects.all()
-    serializer_class = SensorSerializer
+
 
 
 @api_view(["GET"])
@@ -28,20 +25,6 @@ def get_info_id(request):
     return Response(info)
 
 
-@api_view(["POST"])
-def sensor_update(request):
-    """ Изменение информации о датчике"""
-    id = request.GET.get('sensor_id')
-    sensor_name = request.GET.get('name')
-    description = request.GET.get('desc')
-    values = {'name':sensor_name, 'description': description}
-    keys = values.keys()
-    for key in keys:
-       if values[key] == None:
-           del(values[key])
-    Sensor.objects.select_for_update().filter(id=id).update(**values)
-    return Response({'status': 'Обновление успешно прошло'})
-
 
 @api_view(["POST"])
 def add_measurement(request):
@@ -55,15 +38,37 @@ def add_measurement(request):
     return Response({'status': 'Измерение успешно добавлено'})
 
 
-@api_view(["POST"])
-def add_sensor(request):
-    """ Добавить измерение у датчика по id"""
-    name = request.GET.get('name')
-    description = request.GET.get('description')
-    Sensor(name=name, description=description).save()
-    return Response({'status': 'Датчик успешно добавлен'})
+class SensorGetList(ListAPIView):
+    """ ПОлучить сипско датчиков"""
+    queryset = Sensor.objects.all()
+    serializer_class = SensorSerializer
 
 
 class SensorDetailsView(RetrieveAPIView):
     queryset = Sensor.objects.all().prefetch_related('sensor')
     serializer_class = SensorDetailSerializer
+
+
+
+class SensorCls(ListCreateAPIView):
+    queryset = Sensor.objects.all()
+    serializer_class = SensorDetailSerializer
+
+    def post(self, reauest):
+        sens_new = reauest.data.get("sensor")
+        print(sens_new)
+        serializer = SensorSerializer(data=sens_new)
+        if serializer.is_valid(raise_exception=True):
+            sensor_saved = serializer.save()
+        return Response({"success": "Sensor '{}' created successfully".format(sensor_saved)})
+
+
+    def put(self, request, pk):
+        saved_article = get_object_or_404(Sensor.objects.all(), pk=pk)
+        data = request.data.get('sensor')
+        serializer = SensorSerializer(instance=saved_article, data=data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            sensor_saved = serializer.save()
+        return Response({
+            "success": "Sensor '{}' updated successfully".format(sensor_saved)})
+
